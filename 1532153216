@@ -1,0 +1,10 @@
+-- step 2
+local targetPosition = Vector3.new(5867.72, 1208.32, 868.72)
+
+local player = game:GetService("Players").LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+character:WaitForChild("HumanoidRootPart")
+
+character.HumanoidRootPart.CFrame = CFrame.new(targetPosition)
+
