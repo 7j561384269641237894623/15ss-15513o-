@@ -9,7 +9,7 @@ local positions = {
     {name = "Skull Slayer", position = Vector3.new(-16827.50, 130, 1655.35)},
     {name = "Serpent Hunter", position = Vector3.new(-16584.35, 130, 1406.20)}
 }
-local speed = 170 -- Tốc độ di chuyển
+local speed = 150 -- Tốc độ di chuyển
 local isFarming = true -- Biến điều khiển quá trình farm
 local busoActive = false -- Kiểm tra trạng thái Buso
 local enemiesDefeated = 0 -- Đếm số kẻ địch đã tiêu diệt
