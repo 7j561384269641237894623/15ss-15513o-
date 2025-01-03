@@ -5,7 +5,7 @@ local character = player.Character or player.CharacterAdded:Wait()
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 -- Vị trí đích
-local targetPosition = Vector3.new(5431.34, 1004.12, 493.66)
+local targetPosition = Vector3.new(5866.57, 1208.32, 870.75)
 local tweenSpeed = 170 -- Tốc độ Tween
 local noclipEnabled = true -- Bật Noclip
 
