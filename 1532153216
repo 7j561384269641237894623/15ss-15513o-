@@ -1,10 +1,170 @@
--- step 2
-local targetPosition = Vector3.new(5867.72, 1208.32, 868.72)
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
 
-local player = game:GetService("Players").LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
+local positions = {
+    {name = "Serpent Hunter", position = Vector3.new(-16513.75, 130, 1701.90)},
+    {name = "Skull Slayer", position = Vector3.new(-16827.50, 130, 1655.35)},
+    {name = "Serpent Hunter", position = Vector3.new(-16584.35, 130, 1406.20)}
+}
+local speed = 170 -- Tốc độ di chuyển
+local isFarming = true -- Biến điều khiển quá trình farm
+local busoActive = false -- Kiểm tra trạng thái Buso
+local enemiesDefeated = 0 -- Đếm số kẻ địch đã tiêu diệt
+local maxEnemies = 20 -- Số lượng kẻ địch cần tiêu diệt trước khi dừng
 
-character:WaitForChild("HumanoidRootPart")
+-- Vị trí để di chuyển sau khi tiêu diệt đủ kẻ địch
+local targetAfterMaxDefeats = Vector3.new(5866.57, 1208.32, 870.75)
 
-character.HumanoidRootPart.CFrame = CFrame.new(targetPosition)
+-- Hàm kiểm tra sở hữu Dojo Belt (White)
+function getAcc(BeltName)
+    for i, v in pairs(game:GetService("ReplicatedStorage").Remotes.CommF_:InvokeServer("getInventory")) do
+        if type(v) == "table" then
+            if v.Type == "Wear" and v.Name == BeltName then
+                return true
+            end
+        end
+    end
+    return false
+end
 
+-- Hàm bật Buso
+local function activateBuso()
+    if not busoActive then
+        local args = { [1] = "Buso" }
+        ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+        busoActive = true
+    end
+end
+
+-- Hàm trang bị Dragon Talon liên tục nếu chưa được trang bị
+local function ensureDragonTalonEquipped()
+    if not player.Character:FindFirstChild("Dragon Talon") then
+        local backpack = player.Backpack:FindFirstChild("Dragon Talon")
+        if backpack then
+            backpack.Parent = player.Character
+        end
+    end
+end
+
+-- Hàm neo nhân vật tại vị trí đích
+local function anchorCharacter()
+    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.Anchored = true
+    end
+end
+
+-- Hàm bỏ neo nhân vật
+local function unanchorCharacter()
+    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.Anchored = false
+    end
+end
+
+-- Hàm di chuyển đến vị trí
+local function moveToPosition(targetPosition, callback)
+    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        local targetCFrame = CFrame.new(targetPosition)
+        local tweenInfo = TweenInfo.new(
+            (targetPosition - humanoidRootPart.Position).Magnitude / speed,
+            Enum.EasingStyle.Quad
+        )
+        local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+        getgenv().noclip = true
+        tween:Play()
+        tween.Completed:Connect(function()
+            getgenv().noclip = false
+            callback()
+        end)
+    end
+end
+
+-- Hàm kiểm tra tất cả quái vật tại vị trí đã bị tiêu diệt
+local function areAllEnemiesDead(enemyName)
+    local enemies = Workspace:FindFirstChild("Enemies")
+    if enemies then
+        for _, enemy in pairs(enemies:GetChildren()) do
+            if enemy.Name == enemyName and enemy:FindFirstChild("Humanoid") and enemy.Humanoid.Health > 0 then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- Logic chính
+local function startCycle()
+    local currentStep = 1
+
+    local function processNextStep()
+        if not isFarming or enemiesDefeated >= maxEnemies then
+            -- Dừng farm và di chuyển đến vị trí mới
+            moveToPosition(targetAfterMaxDefeats, function()
+                print("Đã di chuyển đến vị trí mới sau khi tiêu diệt đủ số lượng kẻ địch.")
+            end)
+            return
+        end
+
+        local step = positions[currentStep]
+        if not step then
+            currentStep = 1
+            step = positions[currentStep]
+        end
+
+        moveToPosition(step.position, function()
+            -- Neo nhân vật
+            anchorCharacter()
+
+            local startTime = tick()
+            local allEnemiesDead = false
+
+            while tick() - startTime <= 10 do
+                if not isFarming or enemiesDefeated >= maxEnemies then return end
+
+                -- Kiểm tra nếu tất cả quái vật đã bị tiêu diệt
+                allEnemiesDead = areAllEnemiesDead(step.name)
+                if allEnemiesDead then
+                    enemiesDefeated = enemiesDefeated + 1
+                    print("Đã tiêu diệt kẻ địch: " .. enemiesDefeated)
+                    break
+                end
+
+                -- Di chuyển quái vật đến gần nhân vật
+                local enemiesFolder = Workspace:FindFirstChild("Enemies")
+                if enemiesFolder then
+                    for _, enemy in pairs(enemiesFolder:GetChildren()) do
+                        if enemy.Name == step.name and enemy:FindFirstChild("HumanoidRootPart") then
+                            local enemyRoot = enemy.HumanoidRootPart
+                            local targetPosition = Vector3.new(
+                                player.Character.HumanoidRootPart.Position.X,
+                                enemyRoot.Position.Y,
+                                player.Character.HumanoidRootPart.Position.Z
+                            )
+                            enemyRoot.CFrame = CFrame.new(targetPosition)
+                        end
+                    end
+                end
+
+                task.wait(1)
+            end
+
+            -- Bỏ neo và chuyển đến vị trí tiếp theo
+            unanchorCharacter()
+
+            currentStep = currentStep + 1
+            processNextStep()
+        end)
+    end
+
+    processNextStep()
+end
+
+-- Bật Buso, trang bị Dragon Talon, khởi động vòng lặp farm
+activateBuso()
+ensureDragonTalonEquipped()
+startCycle()
