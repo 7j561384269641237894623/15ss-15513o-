@@ -1,0 +1,239 @@
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Biến trạng thái
+local step1Completed = false
+local resettingCharacter = false
+
+-- Hàm thiết lập noclip
+local function setNoClip(state)
+    for _, part in pairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not state
+        end
+    end
+end
+
+-- Hàm tween di chuyển
+local function tweenTo(position, speed)
+    local distance = (position - humanoidRootPart.Position).Magnitude
+    local tweenTime = distance / speed
+    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    local tween = TweenService:Create(humanoidRootPart, tweenInfo, {CFrame = CFrame.new(position)})
+    setNoClip(true)
+    tween:Play()
+    tween.Completed:Wait()
+    setNoClip(false)
+end
+
+-- Step 1: Mua thuyền và di chuyển
+local function step1()
+    if resettingCharacter then return end -- Ngăn Step 1 chạy khi đang reset nhân vật
+
+    step1Completed = false -- Reset trạng thái
+    -- Di chuyển tới vị trí mua thuyền
+    local targetPosition = Vector3.new(-16927.08, 9.10, 435.14)
+    tweenTo(targetPosition, 170)
+
+    -- Mua thuyền
+    local args = { [1] = "BuyBoat", [2] = "Dinghy" }
+    ReplicatedStorage.Remotes.CommF_:InvokeServer(unpack(args))
+    print("Đã mua thuyền Dinghy!")
+
+    task.wait(2) -- Chờ 2 giây
+
+    -- Kiểm tra và di chuyển tới VehicleSeat
+    local boat = Workspace:FindFirstChild("Boats") and Workspace.Boats:FindFirstChild("Dinghy")
+    if boat and boat:FindFirstChild("Owner") and boat.Owner.Value == player then
+        local vehicleSeat = boat:FindFirstChild("VehicleSeat")
+        if vehicleSeat then
+            tweenTo(vehicleSeat.Position, 170)
+            print("Đã di chuyển tới VehicleSeat!")
+
+            -- Kiểm tra SeatWeld
+            task.wait(1)
+            if vehicleSeat:FindFirstChild("SeatWeld") then
+                print("SeatWeld tồn tại! Đã ngồi lên thuyền.")
+                step1Completed = true -- Đánh dấu hoàn thành Step 1
+            else
+                print("SeatWeld không tồn tại! Nhân vật chưa ngồi lên thuyền.")
+            end
+        else
+            print("Không tìm thấy VehicleSeat!")
+        end
+    else
+        print("Nhân vật không phải chủ sở hữu thuyền!")
+    end
+end
+
+-- Step 2: Điều khiển thuyền tới vị trí mục tiêu
+local function step2()
+    -- Đợi Step 1 hoàn thành
+    while not step1Completed do
+        task.wait(0.1)
+    end
+
+    -- Lấy Dinghy
+    local dinghy = Workspace.Boats:FindFirstChild("Dinghy")
+    if not dinghy then
+        warn("Không tìm thấy phương tiện 'Dinghy'!")
+        return
+    end
+
+    -- Lấy HumanoidRootPart hoặc PrimaryPart của Dinghy
+    local dinghyPrimaryPart = dinghy:FindFirstChild("HumanoidRootPart") or dinghy.PrimaryPart
+    if not dinghyPrimaryPart then
+        warn("'Dinghy' không có HumanoidRootPart hoặc PrimaryPart!")
+        return
+    end
+
+    -- Lấy nhân vật
+    local targetPosition = Vector3.new(-301000, 500, 100000)
+    local speed = 150
+    local noclipActive = true
+    local shouldStop = false
+    local detectionRadius = 300
+
+    local targetEnemies = {
+        ["Terrorshark"] = true,
+        ["Shark"] = true
+    }
+
+    local function enableNoclip()
+        RunService.Stepped:Connect(function()
+            if noclipActive then
+                for _, part in pairs(dinghy:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end
+    enableNoclip()
+
+    local function checkForEnemiesInRadius()
+        local enemiesFolder = Workspace:FindFirstChild("Enemies")
+        if not enemiesFolder then return nil end
+
+        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+            if enemy:IsA("Model") and enemy:FindFirstChild("HumanoidRootPart") and targetEnemies[enemy.Name] then
+                local enemyPosition = enemy.HumanoidRootPart.Position
+                local distance = (enemyPosition - humanoidRootPart.Position).Magnitude
+                if distance <= detectionRadius then
+                    return enemy
+                end
+            end
+        end
+        return nil
+    end
+
+    local function allEnemiesDefeated()
+        local enemiesFolder = Workspace:FindFirstChild("Enemies")
+        if not enemiesFolder then return true end
+
+        for _, enemy in pairs(enemiesFolder:GetChildren()) do
+            if enemy:IsA("Model") and targetEnemies[enemy.Name] then
+                return false
+            end
+        end
+        return true
+    end
+
+    local function handleEnemyDetection()
+        shouldStop = true
+        print("Dinghy dừng lại vì phát hiện kẻ địch!")
+
+        local seat = dinghy:FindFirstChild("VehicleSeat")
+        if seat and seat:FindFirstChild("SeatWeld") then
+            seat.SeatWeld:Destroy()
+            print("SeatWeld đã được xóa!")
+        end
+
+        local currentPosition = humanoidRootPart.Position
+        local newPosition = Vector3.new(currentPosition.X, 100, currentPosition.Z)
+        humanoidRootPart.CFrame = CFrame.new(newPosition)
+        humanoidRootPart.Anchored = true
+        print("Nhân vật đã được nâng lên độ cao Y: 100!")
+
+        task.spawn(function()
+            while not allEnemiesDefeated() do
+                task.wait(0.1)
+            end
+
+            resettingCharacter = true -- Đánh dấu đang reset nhân vật
+
+            local function resetCharacter()
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.Health = 0
+                end
+            end
+            resetCharacter()
+            print("Nhân vật đã được reset sau khi tiêu diệt toàn bộ kẻ địch!")
+
+            task.wait(2) -- Đợi 2 giây trước khi quay lại Step 1
+            resettingCharacter = false -- Kết thúc trạng thái reset
+            task.spawn(step1) -- Bắt đầu lại Step 1
+        end)
+    end
+
+    local function moveDinghyToTarget()
+        local startPosition = dinghyPrimaryPart.Position
+        local direction = (targetPosition - startPosition).Unit
+        local distance = (targetPosition - startPosition).Magnitude
+
+        local travelTime = distance / speed
+        local startTime = tick()
+
+        local connection
+        connection = RunService.Stepped:Connect(function(_, deltaTime)
+            if shouldStop then
+                connection:Disconnect()
+                task.spawn(handleEnemyDetection)
+                return
+            end
+
+            local elapsed = tick() - startTime
+            local progress = math.clamp(elapsed / travelTime, 0, 1)
+            local currentPosition = startPosition + direction * (distance * progress)
+            currentPosition = Vector3.new(currentPosition.X, 10, currentPosition.Z)
+
+            dinghyPrimaryPart.CFrame = CFrame.new(currentPosition)
+            if progress == 1 then
+                noclipActive = false
+                connection:Disconnect()
+                print("Dinghy đã đến vị trí đích!")
+            end
+        end)
+    end
+
+    task.spawn(function()
+        while true do
+            local enemy = checkForEnemiesInRadius()
+            if enemy then
+                shouldStop = true
+                break
+            end
+            task.wait(0.1)
+        end
+    end)
+
+    moveDinghyToTarget()
+end
+
+-- Gọi Step 1 và Step 2
+task.spawn(step1)
+task.spawn(step2)
