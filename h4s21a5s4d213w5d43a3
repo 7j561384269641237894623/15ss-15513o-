@@ -163,7 +163,7 @@ local function step2()
         end
 
         local currentPosition = humanoidRootPart.Position
-        local newPosition = Vector3.new(currentPosition.X, 100, currentPosition.Z)
+        local newPosition = Vector3.new(currentPosition.X, 70, currentPosition.Z)
         humanoidRootPart.CFrame = CFrame.new(newPosition)
         humanoidRootPart.Anchored = true
         print("Nhân vật đã được nâng lên độ cao Y: 100!")
