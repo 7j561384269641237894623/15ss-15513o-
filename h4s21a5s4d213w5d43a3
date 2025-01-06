@@ -63,13 +63,10 @@ local function step1()
                 print("SeatWeld tồn tại! Đã ngồi lên thuyền.")
                 step1Completed = true -- Đánh dấu hoàn thành Step 1
             else
-                print("SeatWeld không tồn tại! Nhân vật chưa ngồi lên thuyền.")
             end
         else
-            print("Không tìm thấy VehicleSeat!")
         end
     else
-        print("Nhân vật không phải chủ sở hữu thuyền!")
     end
 end
 
