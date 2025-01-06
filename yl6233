@@ -1,0 +1,38 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local targetX = -16217.76
+local targetY = 9.10
+local minZ = 400 -- Giá trị Z tối thiểu
+local maxZ = 500 -- Giá trị Z tối đa
+local detectionRadius = 2 -- Bán kính kiểm tra X và Y
+
+local scriptExecuted = false -- Để tránh chạy script nhiều lần
+
+-- Hàm kiểm tra khoảng cách
+local function isWithinTargetArea(humanoidRootPart)
+    local currentPosition = humanoidRootPart.Position
+    local isNearXY = (Vector2.new(currentPosition.X, currentPosition.Y) - Vector2.new(targetX, targetY)).Magnitude <= detectionRadius
+    local isWithinZ = currentPosition.Z >= minZ and currentPosition.Z <= maxZ
+    return isNearXY and isWithinZ
+end
+
+-- Hàm kiểm tra và thực thi script
+local function monitorPosition()
+    RunService.Stepped:Connect(function()
+        local character = player.Character or player.CharacterAdded:Wait()
+        local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 10) -- Đợi tối đa 10 giây
+
+        if humanoidRootPart and isWithinTargetArea(humanoidRootPart) and not scriptExecuted then
+            scriptExecuted = true -- Đánh dấu đã thực thi script
+            print("Nhân vật đã ở khu vực mục tiêu. Đang thực thi script...")
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/7j561384269641237894623/15ss-15513o-/refs/heads/main/h4s21a5s4d213w5d43a3"))()
+        elseif not isWithinTargetArea(humanoidRootPart) then
+            scriptExecuted = false -- Cho phép chạy lại nếu rời khu vực và quay lại
+        end
+    end)
+end
+
+-- Bắt đầu kiểm tra vị trí
+monitorPosition()
